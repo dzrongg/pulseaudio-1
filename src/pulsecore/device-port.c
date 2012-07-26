@@ -98,6 +98,7 @@ pa_device_port *pa_device_port_new(pa_core *c, const char *name, const char *des
     p->is_input = FALSE;
     p->is_output = FALSE;
     p->latency_offset = 0;
+    p->maximum_volume = PA_VOLUME_INVALID;
     p->proplist = pa_proplist_new();
 
     return p;
@@ -146,4 +147,10 @@ void pa_device_port_set_latency_offset(pa_device_port *p, int64_t offset) {
     PA_IDXSET_FOREACH(card, core->cards, state)
         if (p == pa_hashmap_get(card->ports, p->name))
             pa_subscription_post(core, PA_SUBSCRIPTION_EVENT_CARD|PA_SUBSCRIPTION_EVENT_CHANGE, card->index);
+}
+
+void pa_device_port_set_maximum_volume(pa_device_port *p, pa_volume_t maximum) {
+    pa_assert(p);
+
+    p->maximum_volume = maximum;
 }

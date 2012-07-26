@@ -52,6 +52,7 @@ struct pa_device_port {
     pa_bool_t is_input:1;
     pa_bool_t is_output:1;
     int64_t latency_offset;
+    pa_volume_t maximum_volume;
 
     /* .. followed by some implementation specific data */
 };
@@ -69,5 +70,7 @@ void pa_device_port_hashmap_free(pa_hashmap *h);
 void pa_device_port_set_available(pa_device_port *p, pa_port_available_t available);
 
 void pa_device_port_set_latency_offset(pa_device_port *p, int64_t offset);
+
+void pa_device_port_set_maximum_volume(pa_device_port *p, pa_volume_t maximum);
 
 #endif
