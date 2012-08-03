@@ -68,11 +68,12 @@ struct userdata {
     pa_database *database;
 };
 
-#define ENTRY_VERSION 2
+#define ENTRY_VERSION 3
 
 struct port_info {
     char *name;
     int64_t offset;
+    pa_volume_t max_volume;
 };
 
 struct entry {
@@ -145,6 +146,7 @@ static pa_bool_t entry_write(struct userdata *u, const char *name, const struct 
     PA_HASHMAP_FOREACH(p_info, e->ports, state) {
         pa_tagstruct_puts(t, p_info->name);
         pa_tagstruct_puts64(t, p_info->offset);
+        pa_tagstruct_put_volume(t, p_info->max_volume);
     }
 
     key.data = (char *) name;
@@ -249,6 +251,18 @@ static struct entry* entry_read(struct userdata *u, const char *name) {
             p_info->name = pa_xstrdup(port_name);
             p_info->offset = port_offset;
 
+            if (e->version >= 3) {
+                pa_volume_t max_volume = PA_VOLUME_INVALID;
+
+                if (pa_tagstruct_get_volume(t, &max_volume) < 0) {
+                    pa_xfree(p_info->name);
+                    pa_xfree(p_info);
+                    goto fail;
+                }
+
+                p_info->max_volume = max_volume;
+            }
+
             pa_assert_se(pa_hashmap_put(e->ports, p_info->name, p_info) >= 0);
         }
     }
@@ -313,6 +327,7 @@ static void subscribe_callback(pa_core *c, pa_subscription_event_type_t t, uint3
         p_info = pa_xnew(struct port_info, 1);
         p_info->name = pa_xstrdup(p->name);
         p_info->offset = p->latency_offset;
+        p_info->max_volume = p->max_volume;
 
         pa_assert_se(pa_hashmap_put(entry->ports, p_info->name, p_info) >= 0);
     }
@@ -336,7 +351,10 @@ static void subscribe_callback(pa_core *c, pa_subscription_event_type_t t, uint3
                         dirty = true;
                         break;
                     }
-
+                    if (p_info->max_volume != old_p_info->max_volume) {
+                        dirty = true;
+                        break;
+                    }
                 } else {
                     dirty = true;
                     break;
@@ -391,8 +409,10 @@ static pa_hook_result_t card_new_hook_callback(pa_core *c, pa_card_new_data *new
     pa_log_info("Restoring port latency offsets for card %s.", new_data->name);
 
     PA_HASHMAP_FOREACH(p_info, e->ports, state)
-        if ((p = pa_hashmap_get(new_data->ports, p_info->name)))
+        if ((p = pa_hashmap_get(new_data->ports, p_info->name))) {
             p->latency_offset = p_info->offset;
+            p->max_volume = p_info->max_volume;
+        }
 
     entry_free(e);
 
